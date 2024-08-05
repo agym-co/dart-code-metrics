@@ -18,10 +18,10 @@ import '../use_setstate_synchronously/fact.dart';
 part 'helpers.dart';
 part 'visitor.dart';
 
-class UseWidgetRefSynchronouslyRule extends FlutterRule {
-  static const ruleId = 'use-widgetref-synchronously';
+class UseRefSynchronouslyRule extends FlutterRule {
+  static const ruleId = 'use-ref-synchronously';
 
-  UseWidgetRefSynchronouslyRule([Map<String, Object> options = const {}])
+  UseRefSynchronouslyRule([Map<String, Object> options = const {}])
       : super(
           id: ruleId,
           severity: readSeverity(options, Severity.warning),
@@ -38,8 +38,10 @@ class UseWidgetRefSynchronouslyRule extends FlutterRule {
         .map((node) => createIssue(
               rule: this,
               location: nodeLocation(node: node, source: source),
-              message: 'Avoid using WidgetRef past an await point without '
-                  'checking if the widget is mounted.',
+              message: "Don't use Ref or WidgetRef across an async gap.",
+              verboseMessage: 'Try to move the Ref or WidgetRef usage before '
+                  'the async gap. Inside a Widget, you can also check if the '
+                  'widget is still mounted before accessing the WidgetRef.',
             ))
         .toList(growable: false);
   }

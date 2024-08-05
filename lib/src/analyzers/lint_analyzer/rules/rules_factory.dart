@@ -78,8 +78,8 @@ import 'rules_list/prefer_trailing_comma/prefer_trailing_comma_rule.dart';
 import 'rules_list/prefer_using_list_view/prefer_using_list_view_rule.dart';
 import 'rules_list/provide_correct_intl_args/provide_correct_intl_args_rule.dart';
 import 'rules_list/tag_name/tag_name_rule.dart';
+import 'rules_list/use_ref_synchronously/use_ref_synchronously_rule.dart';
 import 'rules_list/use_setstate_synchronously/use_setstate_synchronously_rule.dart';
-import 'rules_list/use_widget_ref_synchronously/use_widget_ref_synchronously_rule.dart';
 
 final _implementedRules = <String, Rule Function(Map<String, Object>)>{
   AlwaysRemoveListenerRule.ruleId: AlwaysRemoveListenerRule.new,
@@ -116,7 +116,7 @@ final _implementedRules = <String, Rule Function(Map<String, Object>)>{
   AvoidUnnecessaryConditionalsRule.ruleId: AvoidUnnecessaryConditionalsRule.new,
   AvoidUnnecessarySetStateRule.ruleId: AvoidUnnecessarySetStateRule.new,
   UseSetStateSynchronouslyRule.ruleId: UseSetStateSynchronouslyRule.new,
-  UseWidgetRefSynchronouslyRule.ruleId: UseWidgetRefSynchronouslyRule.new,
+  UseRefSynchronouslyRule.ruleId: UseRefSynchronouslyRule.new,
   AvoidUnnecessaryTypeAssertionsRule.ruleId:
       AvoidUnnecessaryTypeAssertionsRule.new,
   AvoidUnnecessaryTypeCastsRule.ruleId: AvoidUnnecessaryTypeCastsRule.new,

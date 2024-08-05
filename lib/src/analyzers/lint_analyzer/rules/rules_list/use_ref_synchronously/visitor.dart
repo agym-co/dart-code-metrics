@@ -1,4 +1,4 @@
-part of 'use_widget_ref_synchronously_rule.dart';
+part of 'use_ref_synchronously_rule.dart';
 
 class _Visitor extends RecursiveAstVisitor<void> {
   _Visitor();
@@ -19,23 +19,17 @@ class _Visitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitBlockFunctionBody(BlockFunctionBody node) {
-    // if (node.toString().startsWith('async {MediaQue')) {
-    //   print((((node.block.statements[4] as ExpressionStatement).expression
-    //           as MethodInvocation)
-    //       .target as SimpleIdentifier)
-    //       .);
-    // }
     if (!node.isAsynchronous) {
       return node.visitChildren(this);
     }
-    final visitor = _AsyncSetStateVisitor();
+    final visitor = _AsyncRefVisitor();
     node.visitChildren(visitor);
     nodes.addAll(visitor.nodes);
   }
 }
 
-class _AsyncSetStateVisitor extends RecursiveAstVisitor<void> {
-  _AsyncSetStateVisitor();
+class _AsyncRefVisitor extends RecursiveAstVisitor<void> {
+  _AsyncRefVisitor();
 
   MountedFact mounted = true.asFact();
   bool inControlFlow = false;

@@ -1,6 +1,6 @@
 // ignore_for_file: parameter_assignments
 
-part of 'use_widget_ref_synchronously_rule.dart';
+part of 'use_ref_synchronously_rule.dart';
 
 typedef MountedFact = Fact<BinaryExpression>;
 
