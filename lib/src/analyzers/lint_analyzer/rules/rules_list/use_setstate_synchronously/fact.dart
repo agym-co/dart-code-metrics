@@ -1,5 +1,3 @@
-part of 'use_setstate_synchronously_rule.dart';
-
 /// Similar to a [bool], with an optional third indeterminate state and metadata.
 abstract class Fact<T> {
   const factory Fact.maybe([T? info]) = _Maybe;
@@ -45,6 +43,6 @@ class _Maybe<T> extends Fact<T> {
   const _Maybe([this.info]) : super._();
 }
 
-extension _BoolExt on bool {
+extension BoolAsFact on bool {
   Fact<T> asFact<T>() => this ? const _Bool(true) : const _Bool(false);
 }
