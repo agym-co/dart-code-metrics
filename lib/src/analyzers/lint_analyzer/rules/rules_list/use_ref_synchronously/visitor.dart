@@ -1,14 +1,11 @@
 part of 'use_ref_synchronously_rule.dart';
 
-class _Visitor extends SimpleAstVisitor<void> {
+class _Visitor extends RecursiveAstVisitor<void> {
   _Visitor();
-
-  static const mountedName = 'mounted';
 
   final nodes = <Expression>[];
 
-  void check(Expression node, Element mountedElement) {
-    print('check($node, $mountedElement)');
+  void check(Expression node) {
     // Checks each of the statements before `child` for a `mounted` check, and
     // returns whether it did not find one (and the caller should keep looking).
 
@@ -22,7 +19,7 @@ class _Visitor extends SimpleAstVisitor<void> {
         break;
       }
 
-      final asyncState = asyncStateTracker.asyncStateFor(child, mountedElement);
+      final asyncState = asyncStateTracker.asyncStateFor(child);
       if (asyncState.isGuarded) {
         return;
       }
@@ -173,53 +170,20 @@ class _Visitor extends SimpleAstVisitor<void> {
   }
 
   @override
-  void visitFunctionExpressionInvocation(FunctionExpressionInvocation node) {
-    _visitArgumentList(node.argumentList);
-  }
-
-  @override
-  void visitInstanceCreationExpression(InstanceCreationExpression node) {
-    _visitArgumentList(node.argumentList);
-  }
-
-  @override
   void visitMethodInvocation(MethodInvocation node) {
-    if (Flutter.isBuildContext(node.target?.staticType, skipNullable: true)) {
-      final buildContextElement = node.target?.buildContextTypedElement;
-      if (buildContextElement != null) {
-        final mountedGetter = buildContextElement.associatedMountedGetter;
-        if (mountedGetter != null) {
-          check(node.target!, mountedGetter);
-        }
-      }
+    if (_isRef(node.target?.staticType, skipNullable: true)) {
+      check(node.target!);
     }
-    _visitArgumentList(node.argumentList);
+    super.visitMethodInvocation(node);
   }
 
   @override
   void visitPrefixedIdentifier(PrefixedIdentifier node) {
     // Getter access.
     if (_isRef(node.prefix.staticType, skipNullable: true)) {
-      final buildContextElement = node.prefix.buildContextTypedElement;
-      if (buildContextElement != null) {
-        final mountedGetter = buildContextElement.associatedMountedGetter;
-        if (mountedGetter != null) {
-          check(node.prefix, mountedGetter);
-        }
-      }
+      check(node.prefix);
     }
-  }
-
-  void _visitArgumentList(ArgumentList node) {
-    for (final argument in node.arguments) {
-      final buildContextElement = argument.buildContextTypedElement;
-      if (buildContextElement != null) {
-        final mountedGetter = buildContextElement.associatedMountedGetter;
-        if (mountedGetter != null) {
-          check(argument, mountedGetter);
-        }
-      }
-    }
+    super.visitPrefixedIdentifier(node);
   }
 }
 
@@ -249,45 +213,6 @@ bool _isExactly(InterfaceElement element, Uri uri, String type) =>
 extension on AsyncState? {
   bool get isGuarded =>
       this == AsyncState.mountedCheck || this == AsyncState.notMountedCheck;
-}
-
-extension on Expression {
-  /// The element of this expression, if it is typed as a BuildContext.
-  Element? get buildContextTypedElement {
-    var self = this;
-    if (self is NamedExpression) {
-      self = self.expression;
-    }
-    if (self is PropertyAccess) {
-      self = self.propertyName;
-    }
-
-    if (self is Identifier) {
-      final element = self.staticElement;
-      if (element == null) {
-        return null;
-      }
-
-      final declaration = element.declaration;
-      // Get the declaration to ensure checks from un-migrated libraries work.
-      final argType = switch (declaration) {
-        ExecutableElement() => declaration.returnType,
-        VariableElement() => declaration.type,
-        _ => null,
-      };
-
-      final isGetter = element is PropertyAccessorElement;
-      if (Flutter.isBuildContext(argType, skipNullable: isGetter)) {
-        return declaration;
-      }
-    } else if (self is ParenthesizedExpression) {
-      return self.expression.buildContextTypedElement;
-    } else if (self is PostfixExpression &&
-        self.operator.type == TokenType.BANG) {
-      return self.operand.buildContextTypedElement;
-    }
-    return null;
-  }
 }
 
 extension DartTypeExtension on DartType? {
