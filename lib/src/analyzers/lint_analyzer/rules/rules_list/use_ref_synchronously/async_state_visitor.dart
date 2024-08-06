@@ -1278,8 +1278,10 @@ abstract final class Flutter {
   static const _nameStatefulWidget = 'StatefulWidget';
   static const _nameWidget = 'Widget';
 
-  static bool hasWidgetAsAscendant(InterfaceElement? element,
-      [Set<InterfaceElement>? alreadySeen]) {
+  static bool hasWidgetAsAscendant(
+    InterfaceElement? element, [
+    Set<InterfaceElement>? alreadySeen,
+  ]) {
     if (element == null) {
       return false;
     }
