@@ -82,9 +82,17 @@ class _Visitor extends RecursiveAstVisitor<void> {
       if (invocation.constructorName.name?.name == constructor.name &&
           staticType.isSameAs(constructor.type, constructor.library)) {
         checkPositionalArguments(
-            constructor.positional, positionalArguments, callback, errorNode);
+          constructor.positional,
+          positionalArguments,
+          callback,
+          errorNode,
+        );
         checkNamedArguments(
-            constructor.named, namedArguments, callback, errorNode);
+          constructor.named,
+          namedArguments,
+          callback,
+          errorNode,
+        );
       }
     }
   }
@@ -113,9 +121,17 @@ class _Visitor extends RecursiveAstVisitor<void> {
         if (invocation.methodName.name == method.name &&
             targetElement.name == method.type) {
           checkPositionalArguments(
-              method.positional, positionalArguments, callback, errorNode);
+            method.positional,
+            positionalArguments,
+            callback,
+            errorNode,
+          );
           checkNamedArguments(
-              method.named, namedArguments, callback, errorNode);
+            method.named,
+            namedArguments,
+            callback,
+            errorNode,
+          );
         }
       }
     } else {
@@ -127,9 +143,17 @@ class _Visitor extends RecursiveAstVisitor<void> {
         if (invocation.methodName.name == method.name &&
             staticType.element?.name == method.type) {
           checkPositionalArguments(
-              method.positional, positionalArguments, callback, errorNode);
+            method.positional,
+            positionalArguments,
+            callback,
+            errorNode,
+          );
           checkNamedArguments(
-              method.named, namedArguments, callback, errorNode);
+            method.named,
+            namedArguments,
+            callback,
+            errorNode,
+          );
         }
       }
     }
@@ -138,10 +162,11 @@ class _Visitor extends RecursiveAstVisitor<void> {
   /// Checks whether [callback] is one of the [namedArguments] for one of the
   /// protected argument [names] for a protected function.
   void checkNamedArguments(
-      List<String> names,
-      List<NamedExpression> namedArguments,
-      Expression callback,
-      Expression errorNode) {
+    List<String> names,
+    List<NamedExpression> namedArguments,
+    Expression callback,
+    Expression errorNode,
+  ) {
     for (final named in names) {
       final argument =
           namedArguments.firstWhereOrNull((a) => a.name.label.name == named);
@@ -157,10 +182,11 @@ class _Visitor extends RecursiveAstVisitor<void> {
   /// Checks whether [callback] is one of the [positionalArguments] for one of
   /// the protected argument [positions] for a protected function.
   void checkPositionalArguments(
-      List<int> positions,
-      List<Expression> positionalArguments,
-      Expression callback,
-      Expression errorNode) {
+    List<int> positions,
+    List<Expression> positionalArguments,
+    Expression callback,
+    Expression errorNode,
+  ) {
     for (final position in positions) {
       if (positionalArguments.length > position &&
           callback == positionalArguments[position]) {

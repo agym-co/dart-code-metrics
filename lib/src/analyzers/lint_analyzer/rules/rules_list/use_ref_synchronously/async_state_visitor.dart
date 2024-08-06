@@ -18,10 +18,9 @@ import 'package:analyzer/src/dart/constant/evaluation.dart';
 import 'package:analyzer/src/dart/constant/utilities.dart';
 import 'package:analyzer/src/dart/constant/value.dart';
 import 'package:analyzer/src/dart/element/element.dart';
+import 'package:analyzer/src/dart/resolver/exit_detector.dart';
 import 'package:analyzer/src/error/codes.g.dart';
 import 'package:collection/collection.dart';
-
-import 'exit_detector.dart';
 
 /// An enum whose values describe the state of asynchrony that a certain node
 /// has in the syntax tree, with respect to another node.
@@ -429,7 +428,8 @@ class AsyncStateVisitor extends SimpleAstVisitor<AsyncState> {
 
   @override
   AsyncState? visitInstanceCreationExpression(
-          InstanceCreationExpression node) =>
+    InstanceCreationExpression node,
+  ) =>
       _asynchronousIfAnyIsAsync(node.argumentList.arguments);
 
   @override
@@ -899,65 +899,145 @@ class ProtectedFunction {
     ProtectedFunction('dart.async', 'Future', 'microtask', positional: [0]),
 
     // Stream constructors.
-    ProtectedFunction('dart.async', 'Stream', 'eventTransformed',
-        positional: [1]),
+    ProtectedFunction(
+      'dart.async',
+      'Stream',
+      'eventTransformed',
+      positional: [1],
+    ),
     ProtectedFunction('dart.async', 'Stream', 'multi', positional: [0]),
     ProtectedFunction('dart.async', 'Stream', 'periodic', positional: [1]),
 
     // StreamController constructors.
-    ProtectedFunction('dart.async', 'StreamController', null,
-        named: ['onListen', 'onPause', 'onResume', 'onCancel']),
-    ProtectedFunction('dart.async', 'StreamController', 'new',
-        named: ['onListen', 'onPause', 'onResume', 'onCancel']),
-    ProtectedFunction('dart.async', 'StreamController', 'broadcast',
-        named: ['onListen', 'onCancel']),
+    ProtectedFunction(
+      'dart.async',
+      'StreamController',
+      null,
+      named: ['onListen', 'onPause', 'onResume', 'onCancel'],
+    ),
+    ProtectedFunction(
+      'dart.async',
+      'StreamController',
+      'new',
+      named: ['onListen', 'onPause', 'onResume', 'onCancel'],
+    ),
+    ProtectedFunction(
+      'dart.async',
+      'StreamController',
+      'broadcast',
+      named: ['onListen', 'onCancel'],
+    ),
   ];
 
   static const instanceMethods = [
     // Future instance methods.
-    ProtectedFunction('dart.async', 'Future', 'catchError',
-        positional: [0], named: ['test']),
-    ProtectedFunction('dart.async', 'Future', 'onError',
-        positional: [0], named: ['test']),
-    ProtectedFunction('dart.async', 'Future', 'then',
-        positional: [0], named: ['onError']),
+    ProtectedFunction(
+      'dart.async',
+      'Future',
+      'catchError',
+      positional: [0],
+      named: ['test'],
+    ),
+    ProtectedFunction(
+      'dart.async',
+      'Future',
+      'onError',
+      positional: [0],
+      named: ['test'],
+    ),
+    ProtectedFunction(
+      'dart.async',
+      'Future',
+      'then',
+      positional: [0],
+      named: ['onError'],
+    ),
     ProtectedFunction('dart.async', 'Future', 'timeout', named: ['onTimeout']),
     ProtectedFunction('dart.async', 'Future', 'whenComplete', positional: [0]),
 
     // Stream instance methods.
     ProtectedFunction('dart.async', 'Stream', 'any', positional: [0]),
-    ProtectedFunction('dart.async', 'Stream', 'asBroadcastStream',
-        named: ['onListen', 'onCancel']),
+    ProtectedFunction(
+      'dart.async',
+      'Stream',
+      'asBroadcastStream',
+      named: ['onListen', 'onCancel'],
+    ),
     ProtectedFunction('dart.async', 'Stream', 'asyncExpand', positional: [0]),
     ProtectedFunction('dart.async', 'Stream', 'asyncMap', positional: [0]),
+    ProtectedFunction('dart.async', 'Stream', 'doOnCancel', positional: [0]),
+    ProtectedFunction('dart.async', 'Stream', 'doOnData', positional: [0]),
+    ProtectedFunction('dart.async', 'Stream', 'doOnDone', positional: [0]),
+    ProtectedFunction('dart.async', 'Stream', 'doOnEach', positional: [0]),
+    ProtectedFunction('dart.async', 'Stream', 'doOnError', positional: [0]),
+    ProtectedFunction('dart.async', 'Stream', 'doOnListen', positional: [0]),
+    ProtectedFunction('dart.async', 'Stream', 'doOnPause', positional: [0]),
+    ProtectedFunction('dart.async', 'Stream', 'doOnResume', positional: [0]),
     ProtectedFunction('dart.async', 'Stream', 'distinct', positional: [0]),
     ProtectedFunction('dart.async', 'Stream', 'expand', positional: [0]),
-    ProtectedFunction('dart.async', 'Stream', 'firstWhere',
-        positional: [0], named: ['orElse']),
+    ProtectedFunction(
+      'dart.async',
+      'Stream',
+      'firstWhere',
+      positional: [0],
+      named: ['orElse'],
+    ),
     ProtectedFunction('dart.async', 'Stream', 'fold', positional: [1]),
     ProtectedFunction('dart.async', 'Stream', 'forEach', positional: [0]),
-    ProtectedFunction('dart.async', 'Stream', 'handleError',
-        positional: [0], named: ['test']),
-    ProtectedFunction('dart.async', 'Stream', 'lastWhere',
-        positional: [0], named: ['orElse']),
-    ProtectedFunction('dart.async', 'Stream', 'listen',
-        positional: [0], named: ['onError', 'onDone']),
+    ProtectedFunction(
+      'dart.async',
+      'Stream',
+      'handleError',
+      positional: [0],
+      named: ['test'],
+    ),
+    ProtectedFunction(
+      'dart.async',
+      'Stream',
+      'lastWhere',
+      positional: [0],
+      named: ['orElse'],
+    ),
+    ProtectedFunction(
+      'dart.async',
+      'Stream',
+      'listen',
+      positional: [0],
+      named: ['onError', 'onDone'],
+    ),
     ProtectedFunction('dart.async', 'Stream', 'map', positional: [0]),
     ProtectedFunction('dart.async', 'Stream', 'reduce', positional: [0]),
-    ProtectedFunction('dart.async', 'Stream', 'singleWhere',
-        positional: [0], named: ['orElse']),
+    ProtectedFunction(
+      'dart.async',
+      'Stream',
+      'singleWhere',
+      positional: [0],
+      named: ['orElse'],
+    ),
     ProtectedFunction('dart.async', 'Stream', 'skipWhile', positional: [0]),
     ProtectedFunction('dart.async', 'Stream', 'takeWhile', positional: [0]),
     ProtectedFunction('dart.async', 'Stream', 'timeout', named: ['onTimeout']),
     ProtectedFunction('dart.async', 'Stream', 'where', positional: [0]),
 
     // StreamSubscription instance methods.
-    ProtectedFunction('dart.async', 'StreamSubscription', 'onData',
-        positional: [0]),
-    ProtectedFunction('dart.async', 'StreamSubscription', 'onDone',
-        positional: [0]),
-    ProtectedFunction('dart.async', 'StreamSubscription', 'onError',
-        positional: [0]),
+    ProtectedFunction(
+      'dart.async',
+      'StreamSubscription',
+      'onData',
+      positional: [0],
+    ),
+    ProtectedFunction(
+      'dart.async',
+      'StreamSubscription',
+      'onDone',
+      positional: [0],
+    ),
+    ProtectedFunction(
+      'dart.async',
+      'StreamSubscription',
+      'onError',
+      positional: [0],
+    ),
   ];
 
   static const staticMethods = [
