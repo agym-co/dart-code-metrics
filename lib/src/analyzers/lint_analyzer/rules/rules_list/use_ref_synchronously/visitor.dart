@@ -1,242 +1,302 @@
 part of 'use_ref_synchronously_rule.dart';
 
-class _Visitor extends RecursiveAstVisitor<void> {
+class _Visitor extends SimpleAstVisitor<void> {
   _Visitor();
 
-  final nodes = <SimpleIdentifier>[];
+  static const mountedName = 'mounted';
 
-  @override
-  void visitCompilationUnit(CompilationUnit node) {
-    for (final declaration in node.declarations) {
-      if (declaration is ClassDeclaration) {
-        final type = declaration.extendsClause?.superclass.type;
-        if (isWidgetOrSubclass(type) || isWidgetStateOrSubclass(type)) {
-          declaration.visitChildren(this);
+  final nodes = <Expression>[];
+
+  void check(Expression node, Element mountedElement) {
+    print('check($node, $mountedElement)');
+    // Checks each of the statements before `child` for a `mounted` check, and
+    // returns whether it did not find one (and the caller should keep looking).
+
+    // Walk back and look for an async gap that is not guarded by a mounted
+    // property check.
+    AstNode? child = node;
+    final asyncStateTracker = AsyncStateTracker();
+    while (child != null && child is! FunctionBody) {
+      final parent = child.parent;
+      if (parent == null) {
+        break;
+      }
+
+      final asyncState = asyncStateTracker.asyncStateFor(child, mountedElement);
+      if (asyncState.isGuarded) {
+        return;
+      }
+
+      if (asyncState == AsyncState.asynchronous) {
+        nodes.add(node);
+        return;
+      }
+
+      child = parent;
+    }
+
+    if (child is FunctionBody) {
+      final parent = child.parent;
+      if (parent is! FunctionExpression) {
+        return;
+      }
+
+      var grandparent = parent.parent;
+      if (grandparent is NamedExpression) {
+        // Given a FunctionBody in a named argument, like
+        // `future.catchError(test: (_) {...})`, we step up once more to the
+        // argument list.
+        grandparent = grandparent.parent;
+      }
+
+      if (grandparent is ArgumentList) {
+        if (grandparent.parent
+            case final InstanceCreationExpression invocation) {
+          checkConstructorCallback(invocation, parent, node);
+        }
+
+        if (grandparent.parent case final MethodInvocation invocation) {
+          checkMethodCallback(invocation, parent, node);
         }
       }
     }
   }
 
-  @override
-  void visitBlockFunctionBody(BlockFunctionBody node) {
-    if (!node.isAsynchronous) {
-      return node.visitChildren(this);
+  /// Checks whether [invocation] involves a [callback] argument for a protected
+  /// constructor.
+  ///
+  /// The code inside a callback argument for a protected constructor must not
+  /// contain any references to a `BuildContext` without a guarding mounted
+  /// check.
+  void checkConstructorCallback(
+    InstanceCreationExpression invocation,
+    FunctionExpression callback,
+    Expression errorNode,
+  ) {
+    final staticType = invocation.staticType;
+    if (staticType == null) {
+      return;
     }
-    final visitor = _AsyncRefVisitor();
-    node.visitChildren(visitor);
-    nodes.addAll(visitor.nodes);
-  }
-}
-
-class _AsyncRefVisitor extends RecursiveAstVisitor<void> {
-  _AsyncRefVisitor();
-
-  MountedFact mounted = true.asFact();
-  bool inControlFlow = false;
-  bool inAsync = true;
-
-  bool get isMounted => mounted.value ?? false;
-  final nodes = <SimpleIdentifier>[];
-
-  @override
-  void visitAwaitExpression(AwaitExpression node) {
-    mounted = false.asFact();
-    super.visitAwaitExpression(node);
+    final arguments = invocation.argumentList.arguments;
+    final positionalArguments =
+        arguments.where((a) => a is! NamedExpression).toList();
+    final namedArguments = arguments.whereType<NamedExpression>().toList();
+    for (final constructor in ProtectedFunction.constructors) {
+      if (invocation.constructorName.name?.name == constructor.name &&
+          staticType.isSameAs(constructor.type, constructor.library)) {
+        checkPositionalArguments(
+            constructor.positional, positionalArguments, callback, errorNode);
+        checkNamedArguments(
+            constructor.named, namedArguments, callback, errorNode);
+      }
+    }
   }
 
+  /// Checks whether [invocation] involves a [callback] argument for a protected
+  /// instance or static method.
+  ///
+  /// The code inside a callback argument for a protected method must not
+  /// contain any references to a `BuildContext` without a guarding mounted
+  /// check.
+  void checkMethodCallback(
+    MethodInvocation invocation,
+    FunctionExpression callback,
+    Expression errorNode,
+  ) {
+    final arguments = invocation.argumentList.arguments;
+    final positionalArguments =
+        arguments.where((a) => a is! NamedExpression).toList();
+    final namedArguments = arguments.whereType<NamedExpression>().toList();
+
+    final target = invocation.realTarget;
+    final targetElement = target is Identifier ? target.staticElement : null;
+    if (targetElement is ClassElement) {
+      // Static function called; `target` is the class.
+      for (final method in ProtectedFunction.staticMethods) {
+        if (invocation.methodName.name == method.name &&
+            targetElement.name == method.type) {
+          checkPositionalArguments(
+              method.positional, positionalArguments, callback, errorNode);
+          checkNamedArguments(
+              method.named, namedArguments, callback, errorNode);
+        }
+      }
+    } else {
+      final staticType = target?.staticType;
+      if (staticType == null) {
+        return;
+      }
+      for (final method in ProtectedFunction.instanceMethods) {
+        if (invocation.methodName.name == method.name &&
+            staticType.element?.name == method.type) {
+          checkPositionalArguments(
+              method.positional, positionalArguments, callback, errorNode);
+          checkNamedArguments(
+              method.named, namedArguments, callback, errorNode);
+        }
+      }
+    }
+  }
+
+  /// Checks whether [callback] is one of the [namedArguments] for one of the
+  /// protected argument [names] for a protected function.
+  void checkNamedArguments(
+      List<String> names,
+      List<NamedExpression> namedArguments,
+      Expression callback,
+      Expression errorNode) {
+    for (final named in names) {
+      final argument =
+          namedArguments.firstWhereOrNull((a) => a.name.label.name == named);
+      if (argument == null) {
+        continue;
+      }
+      if (callback == argument.expression) {
+        nodes.add(errorNode);
+      }
+    }
+  }
+
+  /// Checks whether [callback] is one of the [positionalArguments] for one of
+  /// the protected argument [positions] for a protected function.
+  void checkPositionalArguments(
+      List<int> positions,
+      List<Expression> positionalArguments,
+      Expression callback,
+      Expression errorNode) {
+    for (final position in positions) {
+      if (positionalArguments.length > position &&
+          callback == positionalArguments[position]) {
+        nodes.add(errorNode);
+      }
+    }
+  }
+
   @override
-  void visitAssertStatement(AssertStatement node) {
-    final newMounted = _extractMountedCheck(node.condition);
-    mounted = newMounted.or(mounted);
-    super.visitAssertStatement(node);
+  void visitFunctionExpressionInvocation(FunctionExpressionInvocation node) {
+    _visitArgumentList(node.argumentList);
+  }
+
+  @override
+  void visitInstanceCreationExpression(InstanceCreationExpression node) {
+    _visitArgumentList(node.argumentList);
   }
 
   @override
   void visitMethodInvocation(MethodInvocation node) {
-    if (!inAsync) {
-      return node.visitChildren(this);
+    if (Flutter.isBuildContext(node.target?.staticType, skipNullable: true)) {
+      final buildContextElement = node.target?.buildContextTypedElement;
+      if (buildContextElement != null) {
+        final mountedGetter = buildContextElement.associatedMountedGetter;
+        if (mountedGetter != null) {
+          check(node.target!, mountedGetter);
+        }
+      }
     }
-
-    if (!isMounted &&
-        node.realTarget != null &&
-        _isWidgetRef(node.realTarget!.staticType, skipNullable: true)) {
-      nodes.add(node.methodName);
-    }
-
-    super.visitMethodInvocation(node);
+    _visitArgumentList(node.argumentList);
   }
-
-  // @override
-  // void visitPrefixedIdentifier(PrefixedIdentifier node) {
-  //   print('visitPrefixedIdentifier($node, inAsync: $inAsync)');
-  //   if (!inAsync) {
-  //     return node.visitChildren(this);
-  //   }
-
-  //   if (!isMounted &&
-  //       _isWidgetRef(node.prefix.staticType, skipNullable: true)) {
-  //     nodes.add(node.identifier);
-  //   }
-
-  //   super.visitPrefixedIdentifier(node);
-  // }
-
-  bool _isWidgetRef(DartType? type, {bool skipNullable = false}) {
-    if (type is! InterfaceType) {
-      return false;
-    }
-    if (skipNullable && type.nullabilitySuffix == NullabilitySuffix.question) {
-      return false;
-    }
-
-    return _isExactly(
-      type.element,
-      Uri.parse('package:flutter_riverpod/src/consumer.dart'),
-      'WidgetRef',
-    );
-  }
-
-  bool _isExactly(InterfaceElement element, Uri uri, String type) =>
-      element.source.uri == uri && element.name == type;
 
   @override
-  void visitIfStatement(IfStatement node) {
-    if (!inAsync) {
-      return node.visitChildren(this);
+  void visitPrefixedIdentifier(PrefixedIdentifier node) {
+    // Getter access.
+    if (_isRef(node.prefix.staticType, skipNullable: true)) {
+      final buildContextElement = node.prefix.buildContextTypedElement;
+      if (buildContextElement != null) {
+        final mountedGetter = buildContextElement.associatedMountedGetter;
+        if (mountedGetter != null) {
+          check(node.prefix, mountedGetter);
+        }
+      }
     }
+  }
 
-    // ignore: deprecated_member_use
-    node.condition.accept(this);
+  void _visitArgumentList(ArgumentList node) {
+    for (final argument in node.arguments) {
+      final buildContextElement = argument.buildContextTypedElement;
+      if (buildContextElement != null) {
+        final mountedGetter = buildContextElement.associatedMountedGetter;
+        if (mountedGetter != null) {
+          check(argument, mountedGetter);
+        }
+      }
+    }
+  }
+}
 
-    // ignore: deprecated_member_use
-    final newMounted = _extractMountedCheck(node.condition);
-    mounted = newMounted.or(mounted);
+bool _isRef(DartType? type, {bool skipNullable = false}) {
+  if (type is! InterfaceType) {
+    return false;
+  }
+  if (skipNullable && type.nullabilitySuffix == NullabilitySuffix.question) {
+    return false;
+  }
 
-    final beforeThen = mounted;
-    node.thenStatement.visitChildren(this);
-    final afterThen = mounted;
-
-    var elseDiverges = false;
-    final elseStatement = node.elseStatement;
-    if (elseStatement != null) {
-      elseDiverges = _blockDiverges(
-        elseStatement,
-        allowControlFlow: inControlFlow,
+  return _isExactly(
+        type.element,
+        Uri.parse('package:flutter_riverpod/src/consumer.dart'),
+        'WidgetRef',
+      ) ||
+      _isExactly(
+        type.element,
+        Uri.parse('package:flutter_riverpod/src/framework/ref.dart'),
+        'Ref',
       );
-      mounted = _tryInvert(newMounted).or(mounted);
-      elseStatement.visitChildren(this);
+}
+
+bool _isExactly(InterfaceElement element, Uri uri, String type) =>
+    element.source.uri == uri && element.name == type;
+
+extension on AsyncState? {
+  bool get isGuarded =>
+      this == AsyncState.mountedCheck || this == AsyncState.notMountedCheck;
+}
+
+extension on Expression {
+  /// The element of this expression, if it is typed as a BuildContext.
+  Element? get buildContextTypedElement {
+    var self = this;
+    if (self is NamedExpression) {
+      self = self.expression;
+    }
+    if (self is PropertyAccess) {
+      self = self.propertyName;
     }
 
-    if (_blockDiverges(node.thenStatement, allowControlFlow: inControlFlow)) {
-      mounted = _tryInvert(newMounted).or(beforeThen);
-    } else if (elseDiverges) {
-      mounted = beforeThen != afterThen
-          ? afterThen
-          // ignore: deprecated_member_use
-          : _extractMountedCheck(node.condition, permitAnd: false);
-    }
-  }
-
-  @override
-  void visitWhileStatement(WhileStatement node) {
-    if (!inAsync) {
-      return node.visitChildren(this);
-    }
-
-    node.condition.accept(this);
-
-    final oldMounted = mounted;
-    final newMounted = _extractMountedCheck(node.condition);
-    mounted = newMounted.or(mounted);
-    final oldInControlFlow = inControlFlow;
-    inControlFlow = true;
-    node.body.visitChildren(this);
-
-    if (_blockDiverges(node.body, allowControlFlow: inControlFlow)) {
-      mounted = _tryInvert(newMounted).or(oldMounted);
-    }
-
-    inControlFlow = oldInControlFlow;
-  }
-
-  @override
-  void visitForStatement(ForStatement node) {
-    if (!inAsync) {
-      return node.visitChildren(this);
-    }
-
-    node.forLoopParts.accept(this);
-
-    final oldInControlFlow = inControlFlow;
-    inControlFlow = true;
-
-    node.body.visitChildren(this);
-
-    inControlFlow = oldInControlFlow;
-  }
-
-  @override
-  void visitBlockFunctionBody(BlockFunctionBody node) {
-    final oldMounted = mounted;
-    final oldInAsync = inAsync;
-    mounted = true.asFact();
-    inAsync = node.isAsynchronous;
-
-    node.visitChildren(this);
-
-    mounted = oldMounted;
-    inAsync = oldInAsync;
-  }
-
-  @override
-  void visitTryStatement(TryStatement node) {
-    if (!inAsync) {
-      return node.visitChildren(this);
-    }
-
-    final oldMounted = mounted;
-    node.body.visitChildren(this);
-    final afterBody = mounted;
-    final beforeCatch =
-        mounted == oldMounted ? oldMounted : false.asFact<BinaryExpression>();
-    for (final clause in node.catchClauses) {
-      mounted = beforeCatch;
-      clause.visitChildren(this);
-    }
-
-    final finallyBlock = node.finallyBlock;
-    if (finallyBlock != null) {
-      mounted = beforeCatch;
-      finallyBlock.visitChildren(this);
-    } else {
-      mounted = afterBody;
-    }
-  }
-
-  @override
-  void visitSwitchStatement(SwitchStatement node) {
-    if (!inAsync) {
-      return node.visitChildren(this);
-    }
-
-    node.expression.accept(this);
-
-    final oldInControlFlow = inControlFlow;
-    inControlFlow = true;
-
-    final caseInvariant = mounted;
-    for (final arm in node.members) {
-      arm.visitChildren(this);
-      if (mounted != caseInvariant &&
-          !_caseDiverges(arm, allowControlFlow: false)) {
-        mounted = false.asFact();
+    if (self is Identifier) {
+      final element = self.staticElement;
+      if (element == null) {
+        return null;
       }
 
-      if (_caseDiverges(arm, allowControlFlow: true)) {
-        mounted = caseInvariant;
-      }
-    }
+      final declaration = element.declaration;
+      // Get the declaration to ensure checks from un-migrated libraries work.
+      final argType = switch (declaration) {
+        ExecutableElement() => declaration.returnType,
+        VariableElement() => declaration.type,
+        _ => null,
+      };
 
-    inControlFlow = oldInControlFlow;
+      final isGetter = element is PropertyAccessorElement;
+      if (Flutter.isBuildContext(argType, skipNullable: isGetter)) {
+        return declaration;
+      }
+    } else if (self is ParenthesizedExpression) {
+      return self.expression.buildContextTypedElement;
+    } else if (self is PostfixExpression &&
+        self.operator.type == TokenType.BANG) {
+      return self.operand.buildContextTypedElement;
+    }
+    return null;
+  }
+}
+
+extension DartTypeExtension on DartType? {
+  /// Returns whether `this` is the same element as [interface], declared in
+  /// [library].
+  bool isSameAs(String? interface, String? library) {
+    final self = this;
+    return self is InterfaceType &&
+        self.element.name == interface &&
+        self.element.library.name == library;
   }
 }
