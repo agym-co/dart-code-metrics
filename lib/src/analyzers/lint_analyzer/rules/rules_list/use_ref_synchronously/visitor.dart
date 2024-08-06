@@ -196,6 +196,18 @@ class _Visitor extends RecursiveAstVisitor<void> {
   }
 
   @override
+  void visitClassDeclaration(ClassDeclaration node) {
+    if (node.isKeepAliveProvider) return;
+    super.visitClassDeclaration(node);
+  }
+
+  @override
+  void visitFunctionDeclaration(FunctionDeclaration node) {
+    if (node.isKeepAliveProvider) return;
+    super.visitFunctionDeclaration(node);
+  }
+
+  @override
   void visitMethodInvocation(MethodInvocation node) {
     if (_isRef(node.target?.staticType, skipNullable: true)) {
       check(node.target!);
@@ -234,6 +246,23 @@ bool _is(InterfaceType type, Uri uri, String name) => [type]
     .any((type) => _isExactly(type.element, uri, name));
 bool _isExactly(InterfaceElement element, Uri uri, String name) =>
     element.source.uri == uri && element.name == name;
+
+extension on AnnotatedNode {
+  bool get isKeepAliveProvider => metadata.any(
+        (it) =>
+            it.name.staticElement?.source?.uri ==
+                Uri.parse(
+                  'package:riverpod_annotation/src/riverpod_annotation.dart',
+                ) &&
+            it.name.name == 'Riverpod' &&
+            it.arguments != null &&
+            it.arguments!.arguments.any((it) =>
+                it is NamedExpression &&
+                it.name.label.name == 'keepAlive' &&
+                it.expression is BooleanLiteral &&
+                (it.expression as BooleanLiteral).value),
+      );
+}
 
 extension on AsyncState? {
   bool get isGuarded =>
