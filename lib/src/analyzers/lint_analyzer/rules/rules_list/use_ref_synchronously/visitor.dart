@@ -195,20 +195,19 @@ bool _isRef(DartType? type, {bool skipNullable = false}) {
     return false;
   }
 
-  return _isExactly(
-        type.element,
+  return _is(
+        type,
         Uri.parse('package:flutter_riverpod/src/consumer.dart'),
         'WidgetRef',
       ) ||
-      _isExactly(
-        type.element,
-        Uri.parse('package:flutter_riverpod/src/framework/ref.dart'),
-        'Ref',
-      );
+      _is(type, Uri.parse('package:riverpod/src/framework/ref.dart'), 'Ref');
 }
 
-bool _isExactly(InterfaceElement element, Uri uri, String type) =>
-    element.source.uri == uri && element.name == type;
+bool _is(InterfaceType type, Uri uri, String name) => [type]
+    .followedBy(type.allSupertypes)
+    .any((type) => _isExactly(type.element, uri, name));
+bool _isExactly(InterfaceElement element, Uri uri, String name) =>
+    element.source.uri == uri && element.name == name;
 
 extension on AsyncState? {
   bool get isGuarded =>
