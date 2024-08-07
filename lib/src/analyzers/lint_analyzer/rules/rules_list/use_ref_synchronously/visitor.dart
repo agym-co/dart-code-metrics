@@ -209,7 +209,7 @@ class _Visitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitMethodInvocation(MethodInvocation node) {
-    if (_isRef(node.target?.staticType, skipNullable: true)) {
+    if (_isRefOrRead(node.target?.staticType, skipNullable: true)) {
       check(node.target!);
     }
     super.visitMethodInvocation(node);
@@ -218,27 +218,54 @@ class _Visitor extends RecursiveAstVisitor<void> {
   @override
   void visitPrefixedIdentifier(PrefixedIdentifier node) {
     // Getter access.
-    if (_isRef(node.prefix.staticType, skipNullable: true)) {
+    if (_isRefOrRead(node.prefix.staticType, skipNullable: true)) {
       check(node.prefix);
     }
     super.visitPrefixedIdentifier(node);
   }
+
+  @override
+  void visitSimpleIdentifier(SimpleIdentifier node) {
+    if (_isRefOrRead(node.staticType, skipNullable: true)) {
+      check(node);
+    }
+    super.visitSimpleIdentifier(node);
+  }
 }
 
-bool _isRef(DartType? type, {bool skipNullable = false}) {
-  if (type is! InterfaceType) {
-    return false;
-  }
-  if (skipNullable && type.nullabilitySuffix == NullabilitySuffix.question) {
-    return false;
-  }
+bool _isRefOrRead(DartType? type, {bool skipNullable = false}) {
+  if (type is InterfaceType) {
+    // `Ref` or `WidgetRef`
+    if (skipNullable && type.nullabilitySuffix == NullabilitySuffix.question) {
+      return false;
+    }
 
-  return _is(
-        type,
-        Uri.parse('package:flutter_riverpod/src/consumer.dart'),
-        'WidgetRef',
-      ) ||
-      _is(type, Uri.parse('package:riverpod/src/framework/ref.dart'), 'Ref');
+    return _is(
+          type,
+          Uri.parse('package:flutter_riverpod/src/consumer.dart'),
+          'WidgetRef',
+        ) ||
+        _is(type, Uri.parse('package:riverpod/src/framework/ref.dart'), 'Ref');
+  }
+  if (type is FunctionType) {
+    // `T Function<T>(ProviderListenable<T>)`
+    final typeParameter = type.typeFormals.singleOrNull;
+    final providerListenableParameter = type.normalParameterTypes.singleOrNull;
+    if (typeParameter == null || providerListenableParameter == null) {
+      return false;
+    }
+
+    return providerListenableParameter is InterfaceType &&
+        _is(
+          providerListenableParameter,
+          Uri.parse('package:riverpod/src/framework/foundation.dart'),
+          'ProviderListenable',
+        ) &&
+        type.namedParameterTypes.isEmpty &&
+        type.optionalParameterTypes.isEmpty &&
+        type.returnType.element == typeParameter;
+  }
+  return false;
 }
 
 bool _is(InterfaceType type, Uri uri, String name) => [type]
