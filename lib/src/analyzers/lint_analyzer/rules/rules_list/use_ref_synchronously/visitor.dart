@@ -209,19 +209,10 @@ class _Visitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitMethodInvocation(MethodInvocation node) {
-    if (_isRefOrRead(node.target?.staticType, skipNullable: true)) {
-      check(node.target!);
-    }
-    super.visitMethodInvocation(node);
-  }
-
-  @override
-  void visitPrefixedIdentifier(PrefixedIdentifier node) {
-    // Getter access.
-    if (_isRefOrRead(node.prefix.staticType, skipNullable: true)) {
-      check(node.prefix);
-    }
-    super.visitPrefixedIdentifier(node);
+    // We don't need to visit both the receiver and method name.
+    node.methodName.accept(this);
+    node.typeArguments?.accept(this);
+    node.argumentList.accept(this);
   }
 
   @override
