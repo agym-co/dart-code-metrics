@@ -9,34 +9,29 @@ class _Visitor extends RecursiveAstVisitor<void> {
     // Checks each of the statements before `child` for a `mounted` check, and
     // returns whether it did not find one (and the caller should keep looking).
 
-    // Walk back and look for an async gap that is not guarded by a mounted
-    // property check.
-    AstNode? child = node;
-    final asyncStateTracker = AsyncStateTracker();
-    while (child != null && child is! FunctionBody) {
+    AstNode child = node;
+    while (true) {
+      // Walk back and look for an async gap that is not guarded by a mounted
+      // property check.
+      final asyncStateTracker = AsyncStateTracker();
+      while (child is! FunctionBody) {
+        final parent = child.parent;
+        if (parent == null) break;
+
+        final asyncState = asyncStateTracker.asyncStateFor(child);
+        if (asyncState.isGuarded) return;
+
+        if (asyncState == AsyncState.asynchronous) {
+          nodes.add(node);
+          return;
+        }
+
+        child = parent;
+      }
+      if (child is! FunctionBody) return;
+
       final parent = child.parent;
-      if (parent == null) {
-        break;
-      }
-
-      final asyncState = asyncStateTracker.asyncStateFor(child);
-      if (asyncState.isGuarded) {
-        return;
-      }
-
-      if (asyncState == AsyncState.asynchronous) {
-        nodes.add(node);
-        return;
-      }
-
-      child = parent;
-    }
-
-    if (child is FunctionBody) {
-      final parent = child.parent;
-      if (parent is! FunctionExpression) {
-        return;
-      }
+      if (parent is! FunctionExpression) return;
 
       var grandparent = parent.parent;
       if (grandparent is NamedExpression) {
@@ -46,16 +41,17 @@ class _Visitor extends RecursiveAstVisitor<void> {
         grandparent = grandparent.parent;
       }
 
-      if (grandparent is ArgumentList) {
-        if (grandparent.parent
-            case final InstanceCreationExpression invocation) {
-          checkConstructorCallback(invocation, parent, node);
-        }
+      if (grandparent is! ArgumentList) return;
+      final grandgrandparent = grandparent.parent;
 
-        if (grandparent.parent case final MethodInvocation invocation) {
-          checkMethodCallback(invocation, parent, node);
-        }
+      if (grandparent.parent case final InstanceCreationExpression invocation) {
+        checkConstructorCallback(invocation, parent, node);
+      } else if (grandparent.parent case final MethodInvocation invocation) {
+        checkMethodCallback(invocation, parent, node);
+      } else {
+        return;
       }
+      child = grandgrandparent!;
     }
   }
 
