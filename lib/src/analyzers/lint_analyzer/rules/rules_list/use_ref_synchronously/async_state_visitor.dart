@@ -886,8 +886,13 @@ class AsyncStateVisitor extends SimpleAstVisitor<AsyncState> {
 /// a function must have a mounted guard check for any references to
 /// BuildContext.
 class ProtectedFunction {
-  const ProtectedFunction(this.library, this.type, this.name,
-      {this.positional = const <int>[], this.named = const <String>[]});
+  const ProtectedFunction(
+    this.library,
+    this.type,
+    this.name, {
+    this.positional = const <int>[],
+    this.named = const <String>[],
+  });
 
   // Taken from https://github.com/dart-lang/sdk/blob/965234ccbe07dde0bf9f13466928c56767054d8f/pkg/linter/lib/src/rules/use_build_context_synchronously.dart#L1004-L1079
   static const constructors = [

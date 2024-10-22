@@ -71,9 +71,8 @@ class _Visitor extends RecursiveAstVisitor<void> {
     Expression errorNode,
   ) {
     final staticType = invocation.staticType;
-    if (staticType == null) {
-      return;
-    }
+    if (staticType == null) return;
+
     final arguments = invocation.argumentList.arguments;
     final positionalArguments =
         arguments.where((a) => a is! NamedExpression).toList();
@@ -136,9 +135,8 @@ class _Visitor extends RecursiveAstVisitor<void> {
       }
     } else {
       final staticType = target?.staticType;
-      if (staticType == null) {
-        return;
-      }
+      if (staticType == null) return;
+
       for (final method in ProtectedFunction.instanceMethods) {
         if (invocation.methodName.name == method.name &&
             staticType.element?.name == method.type) {
