@@ -3,7 +3,6 @@
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
-import 'package:collection/collection.dart';
 
 import '../../utils/flutter_types_utils.dart';
 import 'models/file_elements_usage.dart';
@@ -22,7 +21,7 @@ class UsedCodeVisitor extends RecursiveAstVisitor<void> {
         final uri = config.resolvedUri;
 
         return (uri is DirectiveUriWithSource) ? uri.source.fullName : null;
-      }).whereNotNull();
+      }).nonNulls;
       final mainImport = node.element?.importedLibrary?.source.fullName;
 
       final allPaths = {if (mainImport != null) mainImport, ...paths};
@@ -113,7 +112,7 @@ class UsedCodeVisitor extends RecursiveAstVisitor<void> {
 
   void _recordIfExtensionMember(Element? element) {
     if (element != null) {
-      final enclosingElement = element.enclosingElement;
+      final enclosingElement = element.enclosingElement3;
       if (enclosingElement is ExtensionElement) {
         _recordUsedExtension(enclosingElement);
       }
@@ -121,7 +120,7 @@ class UsedCodeVisitor extends RecursiveAstVisitor<void> {
   }
 
   bool _recordConditionalElement(Element element) {
-    final elementPath = element.enclosingElement?.source?.fullName;
+    final elementPath = element.enclosingElement3?.source?.fullName;
     if (elementPath == null) {
       return false;
     }
@@ -175,7 +174,7 @@ class UsedCodeVisitor extends RecursiveAstVisitor<void> {
       return;
     }
 
-    final enclosingElement = element.enclosingElement;
+    final enclosingElement = element.enclosingElement3;
     if (enclosingElement is CompilationUnitElement) {
       _recordUsedElement(element);
     } else if (enclosingElement is ExtensionElement) {

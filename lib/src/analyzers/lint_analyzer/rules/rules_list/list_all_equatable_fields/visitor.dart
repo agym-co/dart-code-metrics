@@ -23,7 +23,7 @@ class _Visitor extends GeneralizingAstVisitor<void> {
         .whereNot((field) => field.isStatic)
         .map((declaration) =>
             declaration.fields.variables.firstOrNull?.name.lexeme)
-        .whereNotNull()
+        .nonNulls
         .toSet();
 
     if (isMixin) {
@@ -61,7 +61,7 @@ class _Visitor extends GeneralizingAstVisitor<void> {
 
   Set<String> _getParentFields(DartType? classType) {
     // ignore: deprecated_member_use
-    final element = classType?.element2;
+    final element = classType?.element;
     if (element is! ClassElement) {
       return {};
     }
@@ -84,17 +84,16 @@ class _Visitor extends GeneralizingAstVisitor<void> {
   bool _isSubclassOfEquatable(DartType? type) =>
       type is InterfaceType && type.allSupertypes.any(_isEquatable);
 
-  bool _isEquatable(DartType? type) =>
-      type?.getDisplayString(withNullability: false) == 'Equatable';
+  bool _isEquatable(DartType? type) => type?.getDisplayString() == 'Equatable';
 
   bool _isEquatableMixin(DartType? type) =>
       // ignore: deprecated_member_use
-      type?.element2 is MixinElement &&
-      type?.getDisplayString(withNullability: false) == 'EquatableMixin';
+      type?.element3 is MixinElement &&
+      type?.getDisplayString() == 'EquatableMixin';
 
   bool _isSubclassOfEquatableMixin(DartType? type) {
     // ignore: deprecated_member_use
-    final element = type?.element2;
+    final element = type?.element;
 
     return element is ClassElement && element.mixins.any(_isEquatableMixin);
   }

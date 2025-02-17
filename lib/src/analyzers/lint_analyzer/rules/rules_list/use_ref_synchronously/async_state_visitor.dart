@@ -1130,7 +1130,7 @@ extension ElementExtension on Element {
     final self = this;
 
     if (self is PropertyAccessorElement) {
-      final enclosingElement = self.enclosingElement;
+      final enclosingElement = self.enclosingElement3;
       if (enclosingElement is InterfaceElement &&
           Flutter.isState(enclosingElement)) {
         // The BuildContext object is the field on Flutter's State class.
